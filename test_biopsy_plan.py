@@ -46,7 +46,7 @@ def check(name, c, r, p, v, expected):
 #   d = 0.6, h = sqrt(1 - 0.36) = 0.8   (a 0.6-0.8-1 right triangle)
 #   enters at s = 10 - 0.8 = 9.2, exits at s = 10 + 0.8 = 10.8
 #   core = 1.6, depth = 10.8
--
+
 def test_intersect():
     return check("Test 1: intersects (x0 = 0.6)",
                  C_UNIT, R_UNIT, [0.6, 0, -10], UP,
