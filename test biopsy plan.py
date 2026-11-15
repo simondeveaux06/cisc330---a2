@@ -41,12 +41,12 @@ def check(name, c, r, p, v, expected):
     return ok
 
 
-# --------------------------------------------------------------------------
+
 # Test 1: INTERSECTS.  x0 = 0.6
 #   d = 0.6, h = sqrt(1 - 0.36) = 0.8   (a 0.6-0.8-1 right triangle)
 #   enters at s = 10 - 0.8 = 9.2, exits at s = 10 + 0.8 = 10.8
 #   core = 1.6, depth = 10.8
-# --------------------------------------------------------------------------
+-
 def test_intersect():
     return check("Test 1: intersects (x0 = 0.6)",
                  C_UNIT, R_UNIT, [0.6, 0, -10], UP,
@@ -54,11 +54,10 @@ def test_intersect():
                   "core_length": 1.6, "insertion_depth": 10.8})
 
 
-# --------------------------------------------------------------------------
+
 # Test 2: TOUCHES (tangent).  x0 = 1
 #   d = 1 = R, h = 0: one contact point at (1, 0, 0), s = 10
 #   core = 0, depth to the contact point = 10
-# --------------------------------------------------------------------------
 def test_tangent():
     return check("Test 2: touches / tangent (x0 = 1)",
                  C_UNIT, R_UNIT, [1, 0, -10], UP,
@@ -66,10 +65,8 @@ def test_tangent():
                   "core_length": 0.0, "insertion_depth": 10.0})
 
 
-# --------------------------------------------------------------------------
 # Test 3: MISSES.  x0 = 2
 #   d = 2 > R: no intersection. core = 0, no insertion depth.
-# --------------------------------------------------------------------------
 def test_miss():
     return check("Test 3: misses (x0 = 2)",
                  C_UNIT, R_UNIT, [2, 0, -10], UP,
