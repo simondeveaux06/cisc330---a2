@@ -1,46 +1,60 @@
-# Line utilities (Primer Part 1)
-#   A line is given by a point on it and a unit direction:  X(s) = L0 + s * u
-# --------------------------------------------------------------------------
+"""
+biopsy_plan.py — compute the salient parameters of a biopsy plan.
 
-def point_line_distance(point, line_pt, line_dir):
+Inputs (from the assignment):
+  C_tum, R_tum : centre and radius of the spherical tumour model, CT frame (mm)
+  P_ct, v_ct   : needle tip position and needle direction, CT frame
+Outputs:
+  targeting error  : distance of the needle axis from the tumour centre (mm)
+  tissue core      : length of the needle trajectory inside the tumour (mm)
+  insertion depth  : how far the needle must advance from its current tip
+                     position to harvest that whole core (mm)
+
+Plan: the needle is inserted forward along its current trajectory,
+    X(s) = P_ct + s * v_ct,   s >= 0   (s = distance travelled, in mm)
+
+Method:
+  1. Targeting error = point_line_distance(C_tum, P_ct, v_ct)
+  2. intersect_line_sphere gives the entry s1 and exit s2 of the line.
+  3. Core length = s2 - s1, and insertion depth = s2: the needle has to reach
+     the far side of the tumour to take the full core.
+
+Edge cases:
+  * Touching (tangent) trajectory: one contact point, core length 0. The depth
+    to the contact point is reported, but there is nothing to harvest.
+  * Miss: core length 0 and no insertion depth (None).
+  * Tumour behind the needle (s2 < 0): moving forward never reaches it, so it
+    is treated as a miss.
+  * Tip already inside the tumour (s1 < 0): the core starts at the tip, so s1
+    is clamped to 0.
+"""
+
+import numpy as np
+from geometry import point_line_distance, intersect_line_sphere
+
+
+def plan_biopsy(c_tum, r_tum, p_ct, v_ct):
     """
-    Shortest (perpendicular) distance from a point to a line.
-
-    With w = point - line_pt and u the unit direction, |w x u| = |w| sin(theta),
-    which is exactly the perpendicular distance. The direction is normalised
-    here so the formula is valid even if the caller passes a non-unit vector.
+    Returns a dict with:
+      'status'          : 'intersects', 'touches' or 'misses'
+      'targeting_error' : mm
+      'core_length'     : mm (0 if the needle touches or misses)
+      'insertion_depth' : mm, or None if the needle misses
     """
-    u = np.asarray(line_dir, dtype=float)
-    u = u / np.linalg.norm(u)
-    w = np.asarray(point, dtype=float) - np.asarray(line_pt, dtype=float)
-    return np.linalg.norm(np.cross(w, u))
+    v = np.asarray(v_ct, dtype=float)
+    v = v / np.linalg.norm(v)
 
+    targeting_error = point_line_distance(c_tum, p_ct, v)
+    s = intersect_line_sphere(p_ct, v, c_tum, r_tum)
 
-def intersect_line_sphere(line_pt, line_dir, center, radius, tol=1e-9):
-    """
-    Intersect the infinite line X(s) = line_pt + s * u with a sphere.
+    if len(s) == 2 and s[1] >= 0:                 # passes through, ahead of the tip
+        s1, s2 = max(s[0], 0.0), s[1]
+        return {"status": "intersects", "targeting_error": targeting_error,
+                "core_length": s2 - s1, "insertion_depth": s2}
 
-    Method:
-      s_c = (center - line_pt) . u        parameter of the point closest to center
-      d   = distance from center to line
-      If d < R:  half-chord h = sqrt(R^2 - d^2)   (Pythagoras: R is the
-                 hypotenuse, d and h are the two sides) -> s = s_c - h, s_c + h
-      If d = R:  the line just touches the sphere      -> s = s_c
-      If d > R:  no intersection                       -> []
-    "d = R" is tested with a tolerance, because floating-point values are
-    rarely exactly equal.
+    if len(s) == 1 and s[0] >= 0:                 # just touches, ahead of the tip
+        return {"status": "touches", "targeting_error": targeting_error,
+                "core_length": 0.0, "insertion_depth": s[0]}
 
-    Returns a sorted list of 0, 1 or 2 line parameters s (distances along u).
-    """
-    u = np.asarray(line_dir, dtype=float)
-    u = u / np.linalg.norm(u)
-    w = np.asarray(center, dtype=float) - np.asarray(line_pt, dtype=float)
-    s_c = float(w @ u)
-    d = point_line_distance(center, line_pt, u)
-
-    if abs(d - radius) <= tol:
-        return [s_c]
-    if d > radius:
-        return []
-    h = np.sqrt(radius**2 - d**2)
-    return [s_c - h, s_c + h]
+    return {"status": "misses", "targeting_error": targeting_error,
+            "core_length": 0.0, "insertion_depth": None}
