@@ -1,6 +1,7 @@
+tration · PY
 """
 registration.py — register the tracked biopsy needle to the CT frame.
-
+ 
 Inputs (from the assignment):
   M1tool, M2tool, M3tool : the three markers in the tool model frame
   Ptool                  : tool tip in the tool model frame
@@ -9,8 +10,8 @@ Inputs (from the assignment):
 Outputs:
   Pct : tool tip in the CT frame
   vct : tool axis direction in the CT frame
-
-Method (Math Primer Part 3:
+ 
+Method (Math Primer Part 3, "registration of corresponding body points"):
   The markers, tip and axis are all rigidly fixed to the tool, so they keep
   the same coordinates in the tool's own marker frame however the tool moves.
   We have two observations of that frame:
@@ -22,29 +23,31 @@ Method (Math Primer Part 3:
   4. Axis (a direction, w = 0):       vct = F_ct_tool @ [vtool, 0]
      A direction is not moved by translation, only rotated.
 """
-
+ 
 import numpy as np
 from geometry import register, transform_point, transform_vector
-
-
-M_TOOL = np.array([[2.0, 18.0, 0.0],    # M1
-                   [8.0, 18.0, 0.0],    # M2
-                   [2.0, 24.0, 0.0]])   # M3
+ 
+# Ground-truth tool model, from Fig. 2 of the assignment, tool model frame.
+# Fig. 2 is in cm (confirmed by the professor); converted here to mm, the
+# unit used everywhere else in the project (tracker error, tumour, depths).
+M_TOOL = np.array([[20.0, 180.0, 0.0],    # M1 = (2, 18, 0) cm
+                   [80.0, 180.0, 0.0],    # M2 = (8, 18, 0) cm
+                   [20.0, 240.0, 0.0]])   # M3 = (2, 24, 0) cm
 P_TOOL = np.array([0.0, 0.0, 0.0])      # tool tip
 V_TOOL = np.array([0.0, -1.0, 0.0])     # tool axis direction (unit)
-
-
+ 
+ 
 def register_tool(markers_tool, p_tool, v_tool, markers_ct):
     """
     Register the tool to the CT frame; return the tip and axis in CT.
-
+ 
     Parameters
     ----------
     markers_tool : (3, 3) M1tool, M2tool, M3tool as rows
     p_tool       : (3,)   tool tip in tool frame
     v_tool       : (3,)   tool axis in tool frame
     markers_ct   : (3, 3) M1ct, M2ct, M3ct as rows, in the SAME order
-
+ 
     Returns
     -------
     p_ct : (3,)   tool tip in CT frame
@@ -56,3 +59,4 @@ def register_tool(markers_tool, p_tool, v_tool, markers_ct):
     p_ct = transform_point(F, p_tool)
     v_ct = transform_vector(F, v_tool)
     return p_ct, v_ct, F
+ 
