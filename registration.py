@@ -27,16 +27,18 @@ Method (Math Primer Part 3, "registration of corresponding body points"):
 import numpy as np
 from geometry import register, transform_point, transform_vector
  
-# Ground-truth tool model, from Fig. 2 of the assignment, tool model frame.
-# Fig. 2 is in cm (confirmed by the professor); converted here to mm, the
-# unit used everywhere else in the project (tracker error, tumour, depths).
-M_TOOL = np.array([[20.0, 180.0, 0.0],    # M1 = (2, 18, 0) cm
-                   [80.0, 180.0, 0.0],    # M2 = (8, 18, 0) cm
-                   [20.0, 240.0, 0.0]])   # M3 = (2, 24, 0) cm
-P_TOOL = np.array([0.0, 0.0, 0.0])      # tool tip
-V_TOOL = np.array([0.0, -1.0, 0.0])     # tool axis direction (unit)
- 
- 
+# Figure 2 dimensions are cm, as clarified by the professor.
+# Convert once so tool coordinates, tracker noise, and CT use mm.
+CM_TO_MM = 10.0
+M_TOOL = CM_TO_MM * np.array([
+    [2.0, 18.0, 0.0],    # M1
+    [8.0, 18.0, 0.0],    # M2
+    [2.0, 24.0, 0.0],    # M3
+])
+P_TOOL = np.array([0.0, 0.0, 0.0])      # tool tip (mm)
+V_TOOL = np.array([0.0, -1.0, 0.0])     # unit axis (dimensionless)
+
+
 def register_tool(markers_tool, p_tool, v_tool, markers_ct):
     """
     Register the tool to the CT frame; return the tip and axis in CT.
