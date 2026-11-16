@@ -10,13 +10,7 @@ Inputs (from the assignment):
 Outputs:
   Pct : tool tip in the CT frame
   vct : tool axis direction in the CT frame
- 
-Method (Math Primer Part 3, "registration of corresponding body points"):
-  The markers, tip and axis are all rigidly fixed to the tool, so they keep
-  the same coordinates in the tool's own marker frame however the tool moves.
-  We have two observations of that frame:
-     e = tool model frame (markers M_tool)
-     v = CT frame         (markers M_ct)
+
   1. Build the marker frame in each:  F_he from M_tool,  F_hv from M_ct
   2. Registration matrix:             F_ct_tool = F_hv @ inv(F_he)
   3. Tip (a point, w = 1):            Pct = F_ct_tool @ [Ptool, 1]
@@ -27,7 +21,6 @@ Method (Math Primer Part 3, "registration of corresponding body points"):
 import numpy as np
 from geometry import register, transform_point, transform_vector
  
-# Figure 2 dimensions are cm, as clarified by the professor.
 # Convert once so tool coordinates, tracker noise, and CT use mm.
 CM_TO_MM = 10.0
 M_TOOL = CM_TO_MM * np.array([
