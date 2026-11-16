@@ -96,7 +96,8 @@ def calibrate_tip(observations):
         )
 
     # Measure how closely the transformed tips share one pivot.
-    residuals = (coefficients @ solution - targets).reshape(-1, 3)
+    predicted = np.sum(coefficients * solution, axis=1)
+    residuals = (predicted - targets).reshape(-1, 3)
     pivot_rms = np.sqrt(np.mean(np.sum(residuals ** 2, axis=1)))
     p_marker = solution[:3]
     pivot = solution[3:]
