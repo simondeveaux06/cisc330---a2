@@ -13,12 +13,6 @@ Outputs:
 Plan: the needle is inserted forward along its current trajectory,
     X(s) = P_ct + s * v_ct,   s >= 0   (s = distance travelled, in mm)
 
-Method:
-  1. Targeting error = point_line_distance(C_tum, P_ct, v_ct)
-  2. intersect_line_sphere gives the entry s1 and exit s2 of the line.
-  3. Core length = s2 - s1, and insertion depth = s2: the needle has to reach
-     the far side of the tumour to take the full core.
-
 Edge cases:
   * Touching (tangent) trajectory: one contact point, core length 0. The depth
     to the contact point is reported, but there is nothing to harvest.
@@ -52,7 +46,7 @@ def plan_biopsy(c_tum, r_tum, p_ct, v_ct):
         return {"status": "intersects", "targeting_error": targeting_error,
                 "core_length": s2 - s1, "insertion_depth": s2}
 
-    if len(s) == 1 and s[0] >= 0:                 # just touches, ahead of the tip
+    if len(s) == 1 and s[0] >= 0:                 
         return {"status": "touches", "targeting_error": targeting_error,
                 "core_length": 0.0, "insertion_depth": s[0]}
 
