@@ -103,7 +103,6 @@ def rot_z(deg):
 
 # Line utilities (Primer Part 1)
 #   A line is given by a point on it and a unit direction:  X(s) = L0 + s * u
-# --------------------------------------------------------------------------
 
 def point_line_distance(point, line_pt, line_dir):
     """
