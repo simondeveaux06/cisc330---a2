@@ -33,6 +33,30 @@ from simulation import (
 )
 
 
+
+def check_vector(output, frame, expected, computed, direction=False,
+                 tolerance=1e-9):
+    """Print one comparison and return its row for the results table."""
+    # Round vector displays while retaining full precision for errors.
+    expected = np.asarray(expected, dtype=float)
+    computed = np.asarray(computed, dtype=float)
+    expected_text = np.array2string(
+        expected, precision=4, suppress_small=True
+    )
+    computed_text = np.array2string(
+        np.round(computed, 4) + 0.0, precision=4, suppress_small=True
+    )
+    error = (angle_error(computed, expected) if direction else
+             np.linalg.norm(computed - expected))
+    unit = "deg" if direction else "mm"
+    passed = error < tolerance
+    print(f"  expected {output} = {expected_text}")
+    print(f"  computed {output} = {computed_text} ({frame})")
+    print(f"  {output} error ({unit}): {error:.3e}")
+    return (output, frame, expected_text, computed_text,
+            f"{error:.3e}", unit, "PASS" if passed else "FAIL")
+
+
 def test_perfect_and_registration():
     """Check exact recovery and tool-to-CT registration."""
     # Calibrate from exact observations and compare with known values.
@@ -60,6 +84,19 @@ def test_perfect_and_registration():
     assert np.allclose(v_ct, expected_axis, atol=1e-10)
 
 
+    # Show exact calibration and registration comparisons.
+    print(f"  pivot residual RMS (mm): {pivot_rms:.3e}")
+    print(f"  plane residual RMS (mm): {plane_rms:.3e}")
+    return [
+        check_vector("Tip", "marker", [-40, -200, 0], p_marker),
+        check_vector("Axis", "marker", V_TOOL, v_marker, direction=True),
+        check_vector("Pivot", "tracker", [30, -20, 80], pivot),
+        check_vector("Tip", "model", P_TOOL, p_model),
+        check_vector("Tip", "CT", expected_tip, p_ct),
+        check_vector("Axis", "CT", expected_axis, v_ct, direction=True),
+    ]
+
+
 def test_changed_tracker_frame():
     """Check calibration after changing tracker coordinates."""
     # Rotate and translate both acquisition sets in tracker space.
@@ -76,6 +113,14 @@ def test_changed_tracker_frame():
     assert np.allclose(p_marker, [-40, -200, 0], atol=1e-10)
     assert np.allclose(pivot, expected_pivot, atol=1e-10)
     assert angle_error(v_marker, V_TOOL) < 1e-10
+
+
+    # Confirm intrinsic coordinates survive a tracker-frame change.
+    return [
+        check_vector("Tip", "marker", [-40, -200, 0], p_marker),
+        check_vector("Axis", "marker", V_TOOL, v_marker, direction=True),
+        check_vector("Pivot", "tracker", expected_pivot, pivot),
+    ]
 
 
 def test_reordered_marker_frame():
@@ -103,6 +148,14 @@ def test_reordered_marker_frame():
     assert angle_error(v_model, V_TOOL) < 1e-10
 
 
+    # Show recovery in the reordered marker frame.
+    return [
+        check_vector("Tip", "marker", expected_tip, p_marker),
+        check_vector("Axis", "marker", expected_axis, v_marker,
+                     direction=True),
+    ]
+
+
 def test_nonzero_model_tip():
     """Check recovery when the model tip is away from the origin."""
     # Shift model coordinates, keeping the physical geometry fixed.
@@ -122,6 +175,13 @@ def test_nonzero_model_tip():
     assert angle_error(v_model, V_TOOL) < 1e-10
 
 
+    # Show recovery of a tip away from the model origin.
+    return [
+        check_vector("Tip", "model", shifted_tip, p_model),
+        check_vector("Axis", "model", V_TOOL, v_model, direction=True),
+    ]
+
+
 def test_degenerate_motion():
     """Reject undefined pivot, plane, and axis-sign estimates."""
     # Stationary poses and shaft spin cannot determine the full tip.
@@ -134,6 +194,8 @@ def test_degenerate_motion():
         else:
             raise AssertionError("unobservable pivot accepted")
 
+    print("  stationary pivot and spin-only pivot: rejected as expected")
+
     # Collinear points do not define a unique plane normal.
     try:
         fit_plane([[0, 0, 0], [1, 0, 0], [2, 0, 0]])
@@ -142,6 +204,8 @@ def test_degenerate_motion():
     else:
         raise AssertionError("collinear plane fit accepted")
 
+    print("  collinear plane: rejected as expected")
+
     # A tip at the marker origin cannot resolve the tipward axis sign.
     try:
         calibrate_axis(spin_observations(), [0, 0, 0])
@@ -149,6 +213,13 @@ def test_degenerate_motion():
         pass
     else:
         raise AssertionError("ambiguous direction sign accepted")
+
+
+    print("  ambiguous tipward sign: rejected as expected")
+    return [
+        (case, "n/a", "Reject input", "Rejected", "n/a", "n/a", "PASS")
+        for case in ["Stationary", "Spin-only", "Collinear", "Axis sign"]
+    ]
 
 
 def test_noise_scale_and_recovery():
@@ -172,6 +243,17 @@ def test_noise_scale_and_recovery():
     assert np.linalg.norm(p_marker - [-40, -200, 0]) < 2.0
     assert angle_error(v_marker, V_TOOL) < 3.0
 
+    # Display the measured noise coverage and noisy recovery limits.
+    print(f"  coordinate sigma (mm): {sigma:.8f}")
+    print(f"  marker errors below 1 mm: {fraction_below_1mm:.2%}")
+    print("  noisy recovery limits: tip < 2 mm, axis < 3 deg")
+    return [
+        check_vector("Tip", "marker", [-40, -200, 0], p_marker,
+                     tolerance=2.0),
+        check_vector("Axis", "marker", V_TOOL, v_marker,
+                     direction=True, tolerance=3.0),
+    ]
+
 
 if __name__ == "__main__":
     # Run each existing test group and print its outcome.
@@ -183,7 +265,33 @@ if __name__ == "__main__":
         test_degenerate_motion,
         test_noise_scale_and_recovery,
     ]
-    for test in tests:
-        test()
-        print(f"PASS: {test.__name__}")
-    print(f"\n{len(tests)}/{len(tests)} tests passed")
+    # Print each test's details and collect the comparison rows.
+    names = ["Exact recovery and registration", "Changed tracker frame",
+             "Reordered markers", "Nonzero model tip", "Degenerate motions",
+             "Noisy recovery"]
+    rows = []
+    passed_count = 0
+    for number, (name, test) in enumerate(zip(names, tests), start=1):
+        print(f"\n=== Test {number}: {name} ===")
+        try:
+            comparisons = test()
+        except AssertionError as error:
+            print(f"  FAIL: {error}")
+            continue
+        rows.extend((str(number), *row) for row in comparisons)
+        passed = all(row[-1] == "PASS" for row in comparisons)
+        print("  PASS" if passed else "  FAIL")
+        passed_count += int(passed)
+
+    # Match the report table layout, with explicit frames and error units.
+    print("\n=== Calibration test summary ===")
+    headers = ("Test", "Output", "Frame", "Predicted", "Computed",
+               "Error", "Unit", "Result")
+    widths = [max(len(str(row[i])) for row in [headers, *rows])
+              for i in range(len(headers))]
+    for row in [headers, *rows]:
+        print("  ".join(str(value).ljust(width)
+                        for value, width in zip(row, widths)))
+    print("\nVectors are rounded for display; errors use full precision.")
+    print(f"{passed_count}/{len(tests)} tests passed")
+    raise SystemExit(0 if passed_count == len(tests) else 1)

@@ -247,6 +247,70 @@ def run(trials=500, seed=330):
     return result
 
 
+def print_results(result):
+    """Display screenshot-friendly exact and noisy calibration results."""
+    # State the physical scale and the acquisition settings.
+    print("\n=== Tool Calibration: setup ===")
+    print("  Figure 2: cm converted to mm (scale = 10)")
+    print(f"  pivot poses: {result['pivot_poses']}")
+    print(f"  spin poses:  {result['spin_poses']}")
+    perfect = result["perfect"]
+    marker_from_model = invert_F(frame_from_points(*M_TOOL))
+    comparisons = [
+        ("tip (marker, mm)", transform_point(marker_from_model, P_TOOL),
+         perfect["p_marker_mm"]),
+        ("axis (marker)", transform_vector(marker_from_model, V_TOOL),
+         perfect["v_marker"]),
+        ("tip (model, mm)", P_TOOL, perfect["p_model_mm"]),
+        ("axis (model)", V_TOOL, perfect["v_model"]),
+        ("pivot (tracker, mm)", [30, -20, 80],
+         perfect["pivot_tracker_mm"]),
+    ]
+
+    # Compare ground truth with exact calibration outputs.
+    print("\n=== Test 1: exact-data calibration ===")
+    for label, expected, computed in comparisons:
+        expected = np.array2string(np.asarray(expected), precision=4,
+                                   suppress_small=True)
+        computed = np.array2string(np.round(computed, 4) + 0.0,
+                                   precision=4, suppress_small=True)
+        print(f"  {label}")
+        print(f"    expected = {expected}, computed = {computed}")
+    for label, key in [("tip error (mm)", "tip_error_mm"),
+                       ("axis error (deg)", "axis_error_deg"),
+                       ("pivot RMS (mm)", "pivot_rms_mm"),
+                       ("plane RMS (mm)", "plane_rms_mm")]:
+        print(f"  {label:<22} {perfect[key]:.3e}")
+    exact_passed = (perfect["tip_error_mm"] < 1e-9
+                    and perfect["axis_error_deg"] < 1e-9)
+    print("  PASS" if exact_passed else "  FAIL")
+
+    # Report measured noisy errors without inventing accuracy thresholds.
+    noisy = result["noisy"]
+    print("\n=== Noisy calibration: repeated trials ===")
+    print(f"  trials: {result['trials']}, seed: {result['seed']}")
+    print(f"  {'Error metric':<22} {'Mean':>9} {'SD':>9} "
+          f"{'Median':>9} {'P95':>9} {'RMSE':>9}")
+    for label, key in [("Tip position (mm)", "tip_error_mm"),
+                       ("Axis direction (deg)", "axis_error_deg")]:
+        values = " ".join(f"{noisy[key][stat]:9.4f}"
+                          for stat in ["mean", "sd", "median", "p95",
+                                       "rmse"])
+        print(f"  {label:<22} {values}")
+
+    # Show whether the observed marker noise agrees with the 95% target.
+    print("\n=== Gaussian marker noise ===")
+    print(f"  coordinate sigma (mm): "
+          f"{result['sigma_per_coordinate_mm']:.8f}")
+    print(f"  marker observations: {noisy['marker_error_samples']:,}")
+    print("  required probability below 1 mm: 95%")
+    print(f"  observed fraction below 1 mm: "
+          f"{noisy['marker_fraction_below_1mm']:.4%}")
+    print(f"  marker error P95 (mm): "
+          f"{noisy['marker_error_p95_mm']:.6f}")
+    print("  Vectors are rounded; errors use full precision.")
+
+
 if __name__ == "__main__":
     # Run the experiment and save results beside this module.
     result = run()
@@ -255,4 +319,5 @@ if __name__ == "__main__":
     output_file = output_directory / "calibration_results.json"
     output_text = json.dumps(result, indent=2)
     output_file.write_text(output_text + "\n")
-    print(output_text)
+    print_results(result)
+    print(f"\nFull numerical results saved to {output_file}")
